@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mordos.API\Mordos.API.csproj" />
+    <ProjectReference Include="..\Mordos.Web\Mordos.Web.csproj" />
   </ItemGroup>
 
 </Project>

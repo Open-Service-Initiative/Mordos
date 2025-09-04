@@ -8,23 +8,15 @@ namespace Mordos.API.Services;
 /// <summary>
 /// Implementation of IBicepTemplateService using Azure Table Storage
 /// </summary>
-public class BicepTemplateService : IBicepTemplateService
+public class BicepTemplateService(TableServiceClient tableServiceClient, ILogger<BicepTemplateService> logger) : IBicepTemplateService
 {
-    private readonly TableServiceClient _tableServiceClient;
-    private readonly ILogger<BicepTemplateService> _logger;
     private const string TableName = "BicepTemplates";
-
-    public BicepTemplateService(TableServiceClient tableServiceClient, ILogger<BicepTemplateService> logger)
-    {
-        _tableServiceClient = tableServiceClient;
-        _logger = logger;
-    }
 
     public async Task<IEnumerable<BicepTemplateResponse>> GetAllTemplatesAsync(string? nameFilter = null, string? tagFilter = null)
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var templates = new List<BicepTemplateResponse>();
@@ -41,12 +33,12 @@ public class BicepTemplateService : IBicepTemplateService
                 templates.Add(BicepTemplateResponse.FromEntity(entity));
             }
 
-            _logger.LogInformation("Retrieved {Count} Bicep templates", templates.Count);
+            logger.LogInformation("Retrieved {Count} Bicep templates", templates.Count);
             return templates.OrderByDescending(t => t.UpdatedAt);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving Bicep templates");
+            logger.LogError(ex, "Error retrieving Bicep templates");
             throw;
         }
     }
@@ -55,23 +47,23 @@ public class BicepTemplateService : IBicepTemplateService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var response = await tableClient.GetEntityIfExistsAsync<BicepTemplate>("BicepTemplate", id);
             
             if (!response.HasValue)
             {
-                _logger.LogInformation("Bicep template with ID {Id} not found", id);
+                logger.LogInformation("Bicep template with ID {Id} not found", id);
                 return null;
             }
 
-            _logger.LogInformation("Retrieved Bicep template with ID {Id}", id);
+            logger.LogInformation("Retrieved Bicep template with ID {Id}", id);
             return BicepTemplateResponse.FromEntity(response.Value);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving Bicep template with ID {Id}", id);
+            logger.LogError(ex, "Error retrieving Bicep template with ID {Id}", id);
             throw;
         }
     }
@@ -80,7 +72,7 @@ public class BicepTemplateService : IBicepTemplateService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var template = new BicepTemplate
@@ -97,12 +89,12 @@ public class BicepTemplateService : IBicepTemplateService
 
             await tableClient.AddEntityAsync(template);
             
-            _logger.LogInformation("Created new Bicep template with ID {Id}", template.Id);
+            logger.LogInformation("Created new Bicep template with ID {Id}", template.Id);
             return BicepTemplateResponse.FromEntity(template);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating Bicep template");
+            logger.LogError(ex, "Error creating Bicep template");
             throw;
         }
     }
@@ -111,14 +103,14 @@ public class BicepTemplateService : IBicepTemplateService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var existingResponse = await tableClient.GetEntityIfExistsAsync<BicepTemplate>("BicepTemplate", id);
             
             if (!existingResponse.HasValue)
             {
-                _logger.LogInformation("Bicep template with ID {Id} not found for update", id);
+                logger.LogInformation("Bicep template with ID {Id} not found for update", id);
                 return null;
             }
 
@@ -143,12 +135,12 @@ public class BicepTemplateService : IBicepTemplateService
 
             await tableClient.UpdateEntityAsync(template, template.ETag);
             
-            _logger.LogInformation("Updated Bicep template with ID {Id}", id);
+            logger.LogInformation("Updated Bicep template with ID {Id}", id);
             return BicepTemplateResponse.FromEntity(template);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating Bicep template with ID {Id}", id);
+            logger.LogError(ex, "Error updating Bicep template with ID {Id}", id);
             throw;
         }
     }
@@ -157,17 +149,17 @@ public class BicepTemplateService : IBicepTemplateService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var response = await tableClient.DeleteEntityAsync("BicepTemplate", id);
             
-            _logger.LogInformation("Deleted Bicep template with ID {Id}", id);
+            logger.LogInformation("Deleted Bicep template with ID {Id}", id);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting Bicep template with ID {Id}", id);
+            logger.LogError(ex, "Error deleting Bicep template with ID {Id}", id);
             return false;
         }
     }
@@ -176,14 +168,14 @@ public class BicepTemplateService : IBicepTemplateService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var existingResponse = await tableClient.GetEntityIfExistsAsync<BicepTemplate>("BicepTemplate", id);
             
             if (!existingResponse.HasValue)
             {
-                _logger.LogInformation("Bicep template with ID {Id} not found for validation", id);
+                logger.LogInformation("Bicep template with ID {Id} not found for validation", id);
                 return false;
             }
 
@@ -197,12 +189,12 @@ public class BicepTemplateService : IBicepTemplateService
 
             await tableClient.UpdateEntityAsync(template, template.ETag);
             
-            _logger.LogInformation("Validated Bicep template with ID {Id}", id);
+            logger.LogInformation("Validated Bicep template with ID {Id}", id);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating Bicep template with ID {Id}", id);
+            logger.LogError(ex, "Error validating Bicep template with ID {Id}", id);
             return false;
         }
     }

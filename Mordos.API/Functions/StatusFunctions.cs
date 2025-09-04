@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
@@ -11,25 +12,18 @@ namespace Mordos.API.Functions;
 /// <summary>
 /// API status and health check functions
 /// </summary>
-public class StatusFunctions
+public class StatusFunctions(ILogger<StatusFunctions> logger)
 {
-    private readonly ILogger<StatusFunctions> _logger;
-
-    public StatusFunctions(ILogger<StatusFunctions> logger)
-    {
-        _logger = logger;
-    }
-
     /// <summary>
     /// Get API status and health
     /// </summary>
     [Function("GetStatus")]
-    [OpenApiOperation(operationId: "GetStatus", tags: new[] { "Status" }, Summary = "Get API status", Description = "Returns the current status and health of the Mordos API", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetStatus", tags: ["Status"], Summary = "Get API status", Description = "Returns the current status and health of the Mordos API", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object), Summary = "Success", Description = "API status information")]
     public IActionResult GetStatus(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "status")] HttpRequest req)
     {
-        _logger.LogInformation("Status endpoint called");
+        logger.LogInformation("Status endpoint called");
 
         var status = new
         {

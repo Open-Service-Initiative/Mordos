@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
@@ -14,22 +15,14 @@ namespace Mordos.API.Functions;
 /// <summary>
 /// Azure Functions for managing Bicep templates
 /// </summary>
-public class BicepTemplatesFunctions
+public class BicepTemplatesFunctions(IBicepTemplateService bicepTemplateService, ILogger<BicepTemplatesFunctions> logger)
 {
-    private readonly IBicepTemplateService _bicepTemplateService;
-    private readonly ILogger<BicepTemplatesFunctions> _logger;
-
-    public BicepTemplatesFunctions(IBicepTemplateService bicepTemplateService, ILogger<BicepTemplatesFunctions> logger)
-    {
-        _bicepTemplateService = bicepTemplateService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Get all Bicep templates
     /// </summary>
     [Function("GetBicepTemplates")]
-    [OpenApiOperation(operationId: "GetBicepTemplates", tags: new[] { "BicepTemplates" }, Summary = "Get all Bicep templates", Description = "Retrieves a list of all Bicep templates with optional filtering", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetBicepTemplates", tags: ["BicepTemplates"], Summary = "Get all Bicep templates", Description = "Retrieves a list of all Bicep templates with optional filtering", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "nameFilter", In = ParameterLocation.Query, Required = false, Type = typeof(string), Summary = "Name filter", Description = "Filter templates by name (case-insensitive partial match)", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "tagFilter", In = ParameterLocation.Query, Required = false, Type = typeof(string), Summary = "Tag filter", Description = "Filter templates by tag (case-insensitive partial match)", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(IEnumerable<BicepTemplateResponse>), Summary = "Success", Description = "List of Bicep templates")]
@@ -41,14 +34,14 @@ public class BicepTemplatesFunctions
             var nameFilter = req.Query["nameFilter"].FirstOrDefault();
             var tagFilter = req.Query["tagFilter"].FirstOrDefault();
 
-            _logger.LogInformation("Getting Bicep templates with filters - Name: {NameFilter}, Tag: {TagFilter}", nameFilter, tagFilter);
+            logger.LogInformation("Getting Bicep templates with filters - Name: {NameFilter}, Tag: {TagFilter}", nameFilter, tagFilter);
 
-            var templates = await _bicepTemplateService.GetAllTemplatesAsync(nameFilter, tagFilter);
+            var templates = await bicepTemplateService.GetAllTemplatesAsync(nameFilter, tagFilter);
             return new OkObjectResult(templates);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving Bicep templates");
+            logger.LogError(ex, "Error retrieving Bicep templates");
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -57,7 +50,7 @@ public class BicepTemplatesFunctions
     /// Get a specific Bicep template by ID
     /// </summary>
     [Function("GetBicepTemplate")]
-    [OpenApiOperation(operationId: "GetBicepTemplate", tags: new[] { "BicepTemplates" }, Summary = "Get Bicep template by ID", Description = "Retrieves a specific Bicep template by its unique identifier", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetBicepTemplate", tags: ["BicepTemplates"], Summary = "Get Bicep template by ID", Description = "Retrieves a specific Bicep template by its unique identifier", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Template ID", Description = "The unique identifier of the template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(BicepTemplateResponse), Summary = "Success", Description = "The requested Bicep template")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Template not found")]
@@ -67,9 +60,9 @@ public class BicepTemplatesFunctions
     {
         try
         {
-            _logger.LogInformation("Getting Bicep template with ID: {Id}", id);
+            logger.LogInformation("Getting Bicep template with ID: {Id}", id);
 
-            var template = await _bicepTemplateService.GetTemplateByIdAsync(id);
+            var template = await bicepTemplateService.GetTemplateByIdAsync(id);
             if (template == null)
             {
                 return new NotFoundObjectResult($"Template with ID '{id}' not found");
@@ -79,7 +72,7 @@ public class BicepTemplatesFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving Bicep template with ID: {Id}", id);
+            logger.LogError(ex, "Error retrieving Bicep template with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -88,7 +81,7 @@ public class BicepTemplatesFunctions
     /// Create a new Bicep template
     /// </summary>
     [Function("CreateBicepTemplate")]
-    [OpenApiOperation(operationId: "CreateBicepTemplate", tags: new[] { "BicepTemplates" }, Summary = "Create new Bicep template", Description = "Creates a new Bicep template", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "CreateBicepTemplate", tags: ["BicepTemplates"], Summary = "Create new Bicep template", Description = "Creates a new Bicep template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(CreateBicepTemplateRequest), Required = true, Description = "The template data to create")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Created, contentType: "application/json", bodyType: typeof(BicepTemplateResponse), Summary = "Created", Description = "The created Bicep template")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json", bodyType: typeof(string), Summary = "Bad Request", Description = "Invalid request data")]
@@ -97,7 +90,7 @@ public class BicepTemplatesFunctions
     {
         try
         {
-            _logger.LogInformation("Creating new Bicep template");
+            logger.LogInformation("Creating new Bicep template");
 
             var request = await req.ReadFromJsonAsync<CreateBicepTemplateRequest>();
             if (request == null)
@@ -116,12 +109,12 @@ public class BicepTemplatesFunctions
                 return new BadRequestObjectResult("Template content is required");
             }
 
-            var template = await _bicepTemplateService.CreateTemplateAsync(request);
+            var template = await bicepTemplateService.CreateTemplateAsync(request);
             return new ObjectResult(template) { StatusCode = 201 };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating Bicep template");
+            logger.LogError(ex, "Error creating Bicep template");
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -130,7 +123,7 @@ public class BicepTemplatesFunctions
     /// Update an existing Bicep template
     /// </summary>
     [Function("UpdateBicepTemplate")]
-    [OpenApiOperation(operationId: "UpdateBicepTemplate", tags: new[] { "BicepTemplates" }, Summary = "Update Bicep template", Description = "Updates an existing Bicep template", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "UpdateBicepTemplate", tags: ["BicepTemplates"], Summary = "Update Bicep template", Description = "Updates an existing Bicep template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Template ID", Description = "The unique identifier of the template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(UpdateBicepTemplateRequest), Required = true, Description = "The template data to update")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(BicepTemplateResponse), Summary = "Success", Description = "The updated Bicep template")]
@@ -142,7 +135,7 @@ public class BicepTemplatesFunctions
     {
         try
         {
-            _logger.LogInformation("Updating Bicep template with ID: {Id}", id);
+            logger.LogInformation("Updating Bicep template with ID: {Id}", id);
 
             var request = await req.ReadFromJsonAsync<UpdateBicepTemplateRequest>();
             if (request == null)
@@ -150,7 +143,7 @@ public class BicepTemplatesFunctions
                 return new BadRequestObjectResult("Invalid request body");
             }
 
-            var template = await _bicepTemplateService.UpdateTemplateAsync(id, request);
+            var template = await bicepTemplateService.UpdateTemplateAsync(id, request);
             if (template == null)
             {
                 return new NotFoundObjectResult($"Template with ID '{id}' not found");
@@ -160,7 +153,7 @@ public class BicepTemplatesFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating Bicep template with ID: {Id}", id);
+            logger.LogError(ex, "Error updating Bicep template with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -169,7 +162,7 @@ public class BicepTemplatesFunctions
     /// Delete a Bicep template
     /// </summary>
     [Function("DeleteBicepTemplate")]
-    [OpenApiOperation(operationId: "DeleteBicepTemplate", tags: new[] { "BicepTemplates" }, Summary = "Delete Bicep template", Description = "Deletes a Bicep template", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "DeleteBicepTemplate", tags: ["BicepTemplates"], Summary = "Delete Bicep template", Description = "Deletes a Bicep template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Template ID", Description = "The unique identifier of the template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NoContent, Summary = "No Content", Description = "Template deleted successfully")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Template not found")]
@@ -179,16 +172,16 @@ public class BicepTemplatesFunctions
     {
         try
         {
-            _logger.LogInformation("Deleting Bicep template with ID: {Id}", id);
+            logger.LogInformation("Deleting Bicep template with ID: {Id}", id);
 
             // Check if template exists first
-            var existingTemplate = await _bicepTemplateService.GetTemplateByIdAsync(id);
+            var existingTemplate = await bicepTemplateService.GetTemplateByIdAsync(id);
             if (existingTemplate == null)
             {
                 return new NotFoundObjectResult($"Template with ID '{id}' not found");
             }
 
-            var success = await _bicepTemplateService.DeleteTemplateAsync(id);
+            var success = await bicepTemplateService.DeleteTemplateAsync(id);
             if (success)
             {
                 return new NoContentResult();
@@ -198,7 +191,7 @@ public class BicepTemplatesFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting Bicep template with ID: {Id}", id);
+            logger.LogError(ex, "Error deleting Bicep template with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -207,7 +200,7 @@ public class BicepTemplatesFunctions
     /// Validate a Bicep template
     /// </summary>
     [Function("ValidateBicepTemplate")]
-    [OpenApiOperation(operationId: "ValidateBicepTemplate", tags: new[] { "BicepTemplates" }, Summary = "Validate Bicep template", Description = "Validates a Bicep template", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "ValidateBicepTemplate", tags: ["BicepTemplates"], Summary = "Validate Bicep template", Description = "Validates a Bicep template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Template ID", Description = "The unique identifier of the template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object), Summary = "Success", Description = "Validation result")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Template not found")]
@@ -217,21 +210,21 @@ public class BicepTemplatesFunctions
     {
         try
         {
-            _logger.LogInformation("Validating Bicep template with ID: {Id}", id);
+            logger.LogInformation("Validating Bicep template with ID: {Id}", id);
 
             // Check if template exists first
-            var existingTemplate = await _bicepTemplateService.GetTemplateByIdAsync(id);
+            var existingTemplate = await bicepTemplateService.GetTemplateByIdAsync(id);
             if (existingTemplate == null)
             {
                 return new NotFoundObjectResult($"Template with ID '{id}' not found");
             }
 
-            var success = await _bicepTemplateService.ValidateTemplateAsync(id);
+            var success = await bicepTemplateService.ValidateTemplateAsync(id);
             return new OkObjectResult(new { Success = success, Message = success ? "Template validation passed" : "Template validation failed" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error validating Bicep template with ID: {Id}", id);
+            logger.LogError(ex, "Error validating Bicep template with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
