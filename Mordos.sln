@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36401.2 d17.14
+VisualStudioVersion = 17.14.36401.2
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mordos.API", "Mordos.API\Mordos.API.csproj", "{09494C88-573A-7C71-DC03-749DEBCF8716}"
 EndProject
@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Utilities", "Utilities", "{
 	ProjectSection(SolutionItems) = preProject
 		.mcp.json = .mcp.json
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mordos.Web", "Mordos.Web\Mordos.Web.csproj", "{9A9ED2D5-9139-0C2D-CB7E-4D251C5E92F5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,6 +34,10 @@ Global
 		{EF99234D-3FE5-6B80-8EFE-0E07656385D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF99234D-3FE5-6B80-8EFE-0E07656385D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF99234D-3FE5-6B80-8EFE-0E07656385D0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A9ED2D5-9139-0C2D-CB7E-4D251C5E92F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A9ED2D5-9139-0C2D-CB7E-4D251C5E92F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A9ED2D5-9139-0C2D-CB7E-4D251C5E92F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A9ED2D5-9139-0C2D-CB7E-4D251C5E92F5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

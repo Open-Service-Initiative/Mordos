@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
@@ -15,22 +16,14 @@ namespace Mordos.API.Functions;
 /// <summary>
 /// Azure Functions for managing deployments
 /// </summary>
-public class DeploymentsFunctions
+public class DeploymentsFunctions(IDeploymentService deploymentService, ILogger<DeploymentsFunctions> logger)
 {
-    private readonly IDeploymentService _deploymentService;
-    private readonly ILogger<DeploymentsFunctions> _logger;
-
-    public DeploymentsFunctions(IDeploymentService deploymentService, ILogger<DeploymentsFunctions> logger)
-    {
-        _deploymentService = deploymentService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Get all deployments
     /// </summary>
     [Function("GetDeployments")]
-    [OpenApiOperation(operationId: "GetDeployments", tags: new[] { "Deployments" }, Summary = "Get all deployments", Description = "Retrieves a list of all deployments with optional filtering", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetDeployments", tags: ["Deployments"], Summary = "Get all deployments", Description = "Retrieves a list of all deployments with optional filtering", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "templateId", In = ParameterLocation.Query, Required = false, Type = typeof(string), Summary = "Template ID filter", Description = "Filter deployments by template ID", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "status", In = ParameterLocation.Query, Required = false, Type = typeof(DeploymentStatus), Summary = "Status filter", Description = "Filter deployments by status", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(IEnumerable<DeploymentResponse>), Summary = "Success", Description = "List of deployments")]
@@ -48,14 +41,14 @@ public class DeploymentsFunctions
                 status = parsedStatus;
             }
 
-            _logger.LogInformation("Getting deployments with filters - TemplateId: {TemplateId}, Status: {Status}", templateIdFilter, status);
+            logger.LogInformation("Getting deployments with filters - TemplateId: {TemplateId}, Status: {Status}", templateIdFilter, status);
 
-            var deployments = await _deploymentService.GetAllDeploymentsAsync(templateIdFilter, status);
+            var deployments = await deploymentService.GetAllDeploymentsAsync(templateIdFilter, status);
             return new OkObjectResult(deployments);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployments");
+            logger.LogError(ex, "Error retrieving deployments");
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -64,7 +57,7 @@ public class DeploymentsFunctions
     /// Get a specific deployment by ID
     /// </summary>
     [Function("GetDeployment")]
-    [OpenApiOperation(operationId: "GetDeployment", tags: new[] { "Deployments" }, Summary = "Get deployment by ID", Description = "Retrieves a specific deployment by its unique identifier", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetDeployment", tags: ["Deployments"], Summary = "Get deployment by ID", Description = "Retrieves a specific deployment by its unique identifier", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Deployment ID", Description = "The unique identifier of the deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(DeploymentResponse), Summary = "Success", Description = "The requested deployment")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Deployment not found")]
@@ -74,9 +67,9 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Getting deployment with ID: {Id}", id);
+            logger.LogInformation("Getting deployment with ID: {Id}", id);
 
-            var deployment = await _deploymentService.GetDeploymentByIdAsync(id);
+            var deployment = await deploymentService.GetDeploymentByIdAsync(id);
             if (deployment == null)
             {
                 return new NotFoundObjectResult($"Deployment with ID '{id}' not found");
@@ -86,7 +79,7 @@ public class DeploymentsFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployment with ID: {Id}", id);
+            logger.LogError(ex, "Error retrieving deployment with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -95,7 +88,7 @@ public class DeploymentsFunctions
     /// Create a new deployment
     /// </summary>
     [Function("CreateDeployment")]
-    [OpenApiOperation(operationId: "CreateDeployment", tags: new[] { "Deployments" }, Summary = "Create new deployment", Description = "Creates a new deployment", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "CreateDeployment", tags: ["Deployments"], Summary = "Create new deployment", Description = "Creates a new deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(CreateDeploymentRequest), Required = true, Description = "The deployment data to create")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.Created, contentType: "application/json", bodyType: typeof(DeploymentResponse), Summary = "Created", Description = "The created deployment")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.BadRequest, contentType: "application/json", bodyType: typeof(string), Summary = "Bad Request", Description = "Invalid request data")]
@@ -104,7 +97,7 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Creating new deployment");
+            logger.LogInformation("Creating new deployment");
 
             var request = await req.ReadFromJsonAsync<CreateDeploymentRequest>();
             if (request == null)
@@ -138,17 +131,17 @@ public class DeploymentsFunctions
                 return new BadRequestObjectResult("Target region is required");
             }
 
-            var deployment = await _deploymentService.CreateDeploymentAsync(request);
+            var deployment = await deploymentService.CreateDeploymentAsync(request);
             return new ObjectResult(deployment) { StatusCode = 201 };
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning(ex, "Invalid argument when creating deployment");
+            logger.LogWarning(ex, "Invalid argument when creating deployment");
             return new BadRequestObjectResult(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating deployment");
+            logger.LogError(ex, "Error creating deployment");
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -157,7 +150,7 @@ public class DeploymentsFunctions
     /// Update an existing deployment
     /// </summary>
     [Function("UpdateDeployment")]
-    [OpenApiOperation(operationId: "UpdateDeployment", tags: new[] { "Deployments" }, Summary = "Update deployment", Description = "Updates an existing deployment", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "UpdateDeployment", tags: ["Deployments"], Summary = "Update deployment", Description = "Updates an existing deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Deployment ID", Description = "The unique identifier of the deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(UpdateDeploymentRequest), Required = true, Description = "The deployment data to update")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(DeploymentResponse), Summary = "Success", Description = "The updated deployment")]
@@ -169,7 +162,7 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Updating deployment with ID: {Id}", id);
+            logger.LogInformation("Updating deployment with ID: {Id}", id);
 
             var request = await req.ReadFromJsonAsync<UpdateDeploymentRequest>();
             if (request == null)
@@ -177,7 +170,7 @@ public class DeploymentsFunctions
                 return new BadRequestObjectResult("Invalid request body");
             }
 
-            var deployment = await _deploymentService.UpdateDeploymentAsync(id, request);
+            var deployment = await deploymentService.UpdateDeploymentAsync(id, request);
             if (deployment == null)
             {
                 return new NotFoundObjectResult($"Deployment with ID '{id}' not found");
@@ -187,7 +180,7 @@ public class DeploymentsFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating deployment with ID: {Id}", id);
+            logger.LogError(ex, "Error updating deployment with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -196,7 +189,7 @@ public class DeploymentsFunctions
     /// Delete a deployment
     /// </summary>
     [Function("DeleteDeployment")]
-    [OpenApiOperation(operationId: "DeleteDeployment", tags: new[] { "Deployments" }, Summary = "Delete deployment", Description = "Deletes a deployment", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "DeleteDeployment", tags: ["Deployments"], Summary = "Delete deployment", Description = "Deletes a deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Deployment ID", Description = "The unique identifier of the deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.NoContent, Summary = "No Content", Description = "Deployment deleted successfully")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Deployment not found")]
@@ -206,16 +199,16 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Deleting deployment with ID: {Id}", id);
+            logger.LogInformation("Deleting deployment with ID: {Id}", id);
 
             // Check if deployment exists first
-            var existingDeployment = await _deploymentService.GetDeploymentByIdAsync(id);
+            var existingDeployment = await deploymentService.GetDeploymentByIdAsync(id);
             if (existingDeployment == null)
             {
                 return new NotFoundObjectResult($"Deployment with ID '{id}' not found");
             }
 
-            var success = await _deploymentService.DeleteDeploymentAsync(id);
+            var success = await deploymentService.DeleteDeploymentAsync(id);
             if (success)
             {
                 return new NoContentResult();
@@ -225,7 +218,7 @@ public class DeploymentsFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting deployment with ID: {Id}", id);
+            logger.LogError(ex, "Error deleting deployment with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -234,7 +227,7 @@ public class DeploymentsFunctions
     /// Start a deployment
     /// </summary>
     [Function("StartDeployment")]
-    [OpenApiOperation(operationId: "StartDeployment", tags: new[] { "Deployments" }, Summary = "Start deployment", Description = "Starts a deployment (changes status to InProgress)", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "StartDeployment", tags: ["Deployments"], Summary = "Start deployment", Description = "Starts a deployment (changes status to InProgress)", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "id", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Deployment ID", Description = "The unique identifier of the deployment", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(object), Summary = "Success", Description = "Deployment started successfully")]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.NotFound, contentType: "application/json", bodyType: typeof(string), Summary = "Not Found", Description = "Deployment not found")]
@@ -244,16 +237,16 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Starting deployment with ID: {Id}", id);
+            logger.LogInformation("Starting deployment with ID: {Id}", id);
 
             // Check if deployment exists first
-            var existingDeployment = await _deploymentService.GetDeploymentByIdAsync(id);
+            var existingDeployment = await deploymentService.GetDeploymentByIdAsync(id);
             if (existingDeployment == null)
             {
                 return new NotFoundObjectResult($"Deployment with ID '{id}' not found");
             }
 
-            var success = await _deploymentService.StartDeploymentAsync(id);
+            var success = await deploymentService.StartDeploymentAsync(id);
             if (success)
             {
                 return new OkObjectResult(new { Success = true, Message = "Deployment started successfully" });
@@ -263,7 +256,7 @@ public class DeploymentsFunctions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting deployment with ID: {Id}", id);
+            logger.LogError(ex, "Error starting deployment with ID: {Id}", id);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }
@@ -272,7 +265,7 @@ public class DeploymentsFunctions
     /// Get deployments by template ID
     /// </summary>
     [Function("GetDeploymentsByTemplate")]
-    [OpenApiOperation(operationId: "GetDeploymentsByTemplate", tags: new[] { "Deployments" }, Summary = "Get deployments by template", Description = "Retrieves all deployments for a specific template", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "GetDeploymentsByTemplate", tags: ["Deployments"], Summary = "Get deployments by template", Description = "Retrieves all deployments for a specific template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter(name: "templateId", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Template ID", Description = "The unique identifier of the template", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(IEnumerable<DeploymentResponse>), Summary = "Success", Description = "List of deployments for the template")]
     public async Task<IActionResult> GetDeploymentsByTemplate(
@@ -281,14 +274,14 @@ public class DeploymentsFunctions
     {
         try
         {
-            _logger.LogInformation("Getting deployments for template ID: {TemplateId}", templateId);
+            logger.LogInformation("Getting deployments for template ID: {TemplateId}", templateId);
 
-            var deployments = await _deploymentService.GetDeploymentsByTemplateIdAsync(templateId);
+            var deployments = await deploymentService.GetDeploymentsByTemplateIdAsync(templateId);
             return new OkObjectResult(deployments);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployments for template ID: {TemplateId}", templateId);
+            logger.LogError(ex, "Error retrieving deployments for template ID: {TemplateId}", templateId);
             return new ObjectResult("Internal server error") { StatusCode = 500 };
         }
     }

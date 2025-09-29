@@ -8,28 +8,18 @@ namespace Mordos.API.Services;
 /// <summary>
 /// Implementation of IDeploymentService using Azure Table Storage
 /// </summary>
-public class DeploymentService : IDeploymentService
+public class DeploymentService(
+    TableServiceClient tableServiceClient,
+    IBicepTemplateService bicepTemplateService,
+    ILogger<DeploymentService> logger) : IDeploymentService
 {
-    private readonly TableServiceClient _tableServiceClient;
-    private readonly IBicepTemplateService _bicepTemplateService;
-    private readonly ILogger<DeploymentService> _logger;
     private const string TableName = "Deployments";
-
-    public DeploymentService(
-        TableServiceClient tableServiceClient, 
-        IBicepTemplateService bicepTemplateService,
-        ILogger<DeploymentService> logger)
-    {
-        _tableServiceClient = tableServiceClient;
-        _bicepTemplateService = bicepTemplateService;
-        _logger = logger;
-    }
 
     public async Task<IEnumerable<DeploymentResponse>> GetAllDeploymentsAsync(string? templateIdFilter = null, DeploymentStatus? statusFilter = null)
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var deployments = new List<DeploymentResponse>();
@@ -46,12 +36,12 @@ public class DeploymentService : IDeploymentService
                 deployments.Add(DeploymentResponse.FromEntity(entity));
             }
 
-            _logger.LogInformation("Retrieved {Count} deployments", deployments.Count);
+            logger.LogInformation("Retrieved {Count} deployments", deployments.Count);
             return deployments.OrderByDescending(d => d.CreatedAt);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployments");
+            logger.LogError(ex, "Error retrieving deployments");
             throw;
         }
     }
@@ -60,23 +50,23 @@ public class DeploymentService : IDeploymentService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var response = await tableClient.GetEntityIfExistsAsync<Deployment>("Deployment", id);
             
             if (!response.HasValue)
             {
-                _logger.LogInformation("Deployment with ID {Id} not found", id);
+                logger.LogInformation("Deployment with ID {Id} not found", id);
                 return null;
             }
 
-            _logger.LogInformation("Retrieved deployment with ID {Id}", id);
+            logger.LogInformation("Retrieved deployment with ID {Id}", id);
             return DeploymentResponse.FromEntity(response.Value);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployment with ID {Id}", id);
+            logger.LogError(ex, "Error retrieving deployment with ID {Id}", id);
             throw;
         }
     }
@@ -86,13 +76,8 @@ public class DeploymentService : IDeploymentService
         try
         {
             // Validate that the template exists
-            var template = await _bicepTemplateService.GetTemplateByIdAsync(request.TemplateId);
-            if (template == null)
-            {
-                throw new ArgumentException($"Template with ID {request.TemplateId} not found", nameof(request.TemplateId));
-            }
-
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var template = await bicepTemplateService.GetTemplateByIdAsync(request.TemplateId) ?? throw new ArgumentException($"Template with ID {request.TemplateId} not found", nameof(request.TemplateId));
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var deployment = new Deployment
@@ -111,12 +96,12 @@ public class DeploymentService : IDeploymentService
 
             await tableClient.AddEntityAsync(deployment);
             
-            _logger.LogInformation("Created new deployment with ID {Id} for template {TemplateId}", deployment.Id, request.TemplateId);
+            logger.LogInformation("Created new deployment with ID {Id} for template {TemplateId}", deployment.Id, request.TemplateId);
             return DeploymentResponse.FromEntity(deployment);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating deployment for template {TemplateId}", request.TemplateId);
+            logger.LogError(ex, "Error creating deployment for template {TemplateId}", request.TemplateId);
             throw;
         }
     }
@@ -125,14 +110,14 @@ public class DeploymentService : IDeploymentService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var existingResponse = await tableClient.GetEntityIfExistsAsync<Deployment>("Deployment", id);
             
             if (!existingResponse.HasValue)
             {
-                _logger.LogInformation("Deployment with ID {Id} not found for update", id);
+                logger.LogInformation("Deployment with ID {Id} not found for update", id);
                 return null;
             }
 
@@ -172,12 +157,12 @@ public class DeploymentService : IDeploymentService
 
             await tableClient.UpdateEntityAsync(deployment, deployment.ETag);
             
-            _logger.LogInformation("Updated deployment with ID {Id}. Status changed: {StatusChanged}", id, statusChanged);
+            logger.LogInformation("Updated deployment with ID {Id}. Status changed: {StatusChanged}", id, statusChanged);
             return DeploymentResponse.FromEntity(deployment);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating deployment with ID {Id}", id);
+            logger.LogError(ex, "Error updating deployment with ID {Id}", id);
             throw;
         }
     }
@@ -186,17 +171,17 @@ public class DeploymentService : IDeploymentService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var response = await tableClient.DeleteEntityAsync("Deployment", id);
             
-            _logger.LogInformation("Deleted deployment with ID {Id}", id);
+            logger.LogInformation("Deleted deployment with ID {Id}", id);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting deployment with ID {Id}", id);
+            logger.LogError(ex, "Error deleting deployment with ID {Id}", id);
             return false;
         }
     }
@@ -215,7 +200,7 @@ public class DeploymentService : IDeploymentService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starting deployment with ID {Id}", id);
+            logger.LogError(ex, "Error starting deployment with ID {Id}", id);
             return false;
         }
     }
@@ -224,7 +209,7 @@ public class DeploymentService : IDeploymentService
     {
         try
         {
-            var tableClient = _tableServiceClient.GetTableClient(TableName);
+            var tableClient = tableServiceClient.GetTableClient(TableName);
             await tableClient.CreateIfNotExistsAsync();
 
             var deployments = new List<DeploymentResponse>();
@@ -234,12 +219,12 @@ public class DeploymentService : IDeploymentService
                 deployments.Add(DeploymentResponse.FromEntity(entity));
             }
 
-            _logger.LogInformation("Retrieved {Count} deployments for template {TemplateId}", deployments.Count, templateId);
+            logger.LogInformation("Retrieved {Count} deployments for template {TemplateId}", deployments.Count, templateId);
             return deployments.OrderByDescending(d => d.CreatedAt);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving deployments for template {TemplateId}", templateId);
+            logger.LogError(ex, "Error retrieving deployments for template {TemplateId}", templateId);
             throw;
         }
     }
